@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /* SPDX-FileCopyrightText: 2026 thunderbird1400@gmx.de */
 /*
- * tempsens.c - minimal example
+ * task.c - minimal example
  *
  * start    main(): setup via tempsens_setup(), then run tempsens_cycle() every 100 ms
  * core     hardware independent base routines: read_eeprom(), read_temperature(), set_leds()
@@ -147,6 +147,10 @@ static void *tempsens_thread(void *arg) {
     period.tv_nsec = PERIOD_NS;
 
     (void)arg; /* warning */
+
+    /* if something goes wrong during setup, dont try division by 0*/
+    if(divisor == 0)
+        return NULL;
 
     for(cycle_no = 0; cycle_no < CYCLES; cycle_no++) {
         printf("cycle %d\n", cycle_no + 1);

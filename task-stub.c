@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT
 /* SPDX-FileCopyrightText: 2026 thunderbird1400@gmx.de */
 /*
- * tempsens.c - minimal example
+ * tasks-stub.c - minimal example on kernel drivers and stubs
  *
  * start    main(): setup via tempsens_setup(), then run tempsens_cycle() every 100 ms
  * core     hardware independent base routines: read_eeprom(), read_temperature(), set_leds()
- * driver   mocks of hw access: driver_read_eeprom(), driver_read_sensor(), driver_set_led()
+ * driver   sysfs files of the kernel drivers: driver_read_eeprom() (at24),
+ *          driver_read_temp_raw() (lm75), driver_set_led() (LED class)
  *
+ * Same as task.c, only the three driver functions differ. The
+ * devices below the drivers are stubs: at24 and lm75 on i2c-stub, the LEDs
+ * from uleds; task-stub-test sets them up and links the driver
+ * files to the fixed paths below (the bus and hwmon numbers change).
  */
 #include <pthread.h>
 #include <stdio.h>
@@ -23,40 +28,59 @@
 enum led { GREEN, YELLOW, RED};
 static const char * const color[] = { "green", "yellow", "red"};
 
-/* tiny simulation, switch with -DMOCK_TYPE_B*/
-#define CYCLES          5           /* simulate 5 cycles */
-#ifdef MOCK_TYPE_B
-#define EEPROM          TYPE_B      /* fixed to Type-B by EEPROM */
-/* mock sensor values in °C/10 */
-static const long mock_temp[CYCLES] = { 20, 90, 0, 110, 1020 };
-#else
-#define EEPROM          TYPE_A      /* fixed to Type-A by EEPROM */
-/* mock sensor values in °C */
-static const long mock_temp[CYCLES] = { 2, 9, 0, 11, 102 };
-#endif
-/* cycle counter for emulation */
+#define CYCLES          5           /* run 5 cycles */
+/* cycle counter */
 static int cycle_no;
+
+/* the driver files, linked here by task-stub-test */
+#define EEPROM_FILE     "/tmp/task-stub/eeprom"        /* at24 */
+#define TEMP_FILE       "/tmp/task-stub/temp1_input"   /* lm75, millidegrees */
+#define LED_FILE        "/sys/class/leds/task-sim-%s/brightness"  /* uleds */
+#define TYPE_OFFSET     5           /* the type byte in the record "TSEN" 1 type ... */
+#define SENSOR_ERROR    (-1000)     /* no answer: far below any threshold, so red */
 
 /**
  * driver_read_eeprom()
  *
- * EEPROM access simulation: this would be replaced by an i2c call
+ * EEPROM access: the type byte of the record through the at24 driver
  *
- * Return: the type of the sensor
+ * Return: the type of the sensor, 0 if the EEPROM cannot be read
  */
 static int driver_read_eeprom(void) {
-    return EEPROM;
+    FILE *file = fopen(EEPROM_FILE, "r");
+    int type = 0;
+
+    if (!file)
+        return 0;
+    if (fseek(file, TYPE_OFFSET, SEEK_SET) == 0) {
+        type = fgetc(file);
+        if (type == EOF)
+            type = 0;
+    }
+    fclose(file);
+    return type;
 }
 
 /**
  * driver_read_temp_raw()
  *
- * Sensor access simulation: this would be replaced by an i2c call
+ * Sensor access: temp1_input of the lm75 driver (millidegrees)
  *
- * Return: the raw value of the sensor
+ * Return: the raw value of the sensor in whole degrees (Type-B: ten times
+ * the temperature), SENSOR_ERROR if the sensor does not answer
  */
 static long driver_read_temp_raw(void) {
-    return mock_temp[cycle_no];
+    FILE *file = fopen(TEMP_FILE, "r");
+    long mdeg;
+    int count;
+
+    if (!file)
+        return SENSOR_ERROR;
+    count = fscanf(file, "%ld", &mdeg);
+    fclose(file);
+    if (count != 1)
+        return SENSOR_ERROR;
+    return mdeg / 1000;
 }
 
 /**
@@ -64,13 +88,19 @@ static long driver_read_temp_raw(void) {
  * @led: input; select one of the LEDs from the enum
  * @on: input; 1 = on, 0 = off
  *
- * LED access simulation: this would be replaced by a sysfs request
+ * LED access: brightness of the LED class device (uleds)
  */
 static void driver_set_led(int led, int on) {
-    if(on)
-        printf("    LED %s on\n", color[led]);
-}
+    char path[80];
+    FILE *file;
 
+    snprintf(path, sizeof(path), LED_FILE, color[led]);
+    file = fopen(path, "w");
+    if (!file)
+        return;
+    fprintf(file, "%d\n", on);
+    fclose(file);
+}
 
 static int divisor; /* the scale, defined by the sensor type (1, 10) */
 
@@ -147,6 +177,10 @@ static void *tempsens_thread(void *arg) {
     period.tv_nsec = PERIOD_NS;
 
     (void)arg; /* warning */
+
+    /* if something goes wrong during setup, dont try division by 0*/
+    if(divisor == 0)
+        return NULL;
 
     for(cycle_no = 0; cycle_no < CYCLES; cycle_no++) {
         printf("cycle %d\n", cycle_no + 1);
