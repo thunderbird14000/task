@@ -7,7 +7,7 @@
  * core     hardware independent base routines: read_eeprom(), read_temperature(), set_leds()
  * driver   mocks of hw access: driver_read_eeprom(), driver_read_sensor(), driver_set_led()
  *
-*/
+ */
 #include <stdio.h>
 #include <time.h>
 
@@ -22,11 +22,17 @@
 enum led { GREEN, YELLOW, RED};
 static const char * const color[] = { "green", "yellow", "red"};
 
-/* tiny simulation*/
+/* tiny simulation, switch with -DMOCK_TYPE_B*/
 #define CYCLES          5           /* simulate 5 cycles */
+#ifdef MOCK_TYPE_B
+#define EEPROM          TYPE_B      /* fixed to Type-B by EEPROM */
+/* mock sensor values in °C/10 */
+static const long mock_temp[CYCLES] = { 20, 90, 0, 110, 1020 };
+#else
 #define EEPROM          TYPE_A      /* fixed to Type-A by EEPROM */
 /* mock sensor values in °C */
 static const long mock_temp[CYCLES] = { 2, 9, 0, 11, 102 };
+#endif
 /* cycle counter for emulation */
 static int cycle_no;
 
