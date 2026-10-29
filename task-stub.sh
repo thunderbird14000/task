@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MIT
 # SPDX-FileCopyrightText: 2026 thunderbird1400@gmx.de
 #
+# This script has been created with assistance of AI
+#
 # task-stub.sh - task-stub against the real kernel drivers
 # on stubs: at24 (24c02, record at offset 0) and lm75 (tmp100) on i2c-stub,
 # the LEDs task-sim-green/-yellow/-red from uleds. The driver files are
