@@ -10,7 +10,7 @@ Task:
 
 Implementataion:
 1. Simple Mock. Will be modified to use i2cstub
-2. Currently, only a simple loop. Will be modified to run a dedicated pthread
+2. ok
 3. Simple Mock. Will be modified to use uleds
 4. ok
 5. ok
