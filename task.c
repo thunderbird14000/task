@@ -141,13 +141,17 @@ static void tempsens_setup(void) {
  */
 static void *tempsens_thread(void *arg) {
 
+    /* only for simulation */
     struct timespec period;
     period.tv_sec = 0;
     period.tv_nsec = PERIOD_NS;
 
+    (void)arg; /* warning */
+
     for(cycle_no = 0; cycle_no < CYCLES; cycle_no++) {
         printf("cycle %d\n", cycle_no + 1);
         int temp = read_temp();
+        printf("cycle %d\n", temp);
         if (temp < GREEN_FROM)
             set_leds(RED);
         else if (temp < YELLOW_FROM)
@@ -156,8 +160,8 @@ static void *tempsens_thread(void *arg) {
             set_leds(YELLOW);
         else
             set_leds(RED);
+        nanosleep(&period, NULL);
     }
-    nanosleep(&period, NULL);
     return NULL;
 }
 
@@ -168,11 +172,16 @@ static void *tempsens_thread(void *arg) {
  */
 int main(void) {
     pthread_t thread;
+    //struct timespec run_time;
+    //run_time.tv_sec = 0;
+    //run_time.tv_nsec = CYCLES * PERIOD_NS - PERIOD_NS / 2; /*kill after 450ms*/
+
     tempsens_setup();
 
     pthread_create(&thread, NULL, tempsens_thread, NULL);
+    //nanosleep(&run_time, NULL);
     pthread_join(thread, NULL);
-        
+
 
     return 0;
 }
