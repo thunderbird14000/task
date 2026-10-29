@@ -8,6 +8,7 @@
  * driver   mocks of hw access: driver_read_eeprom(), driver_read_sensor(), driver_set_led()
  *
  */
+#include <pthread.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -134,20 +135,30 @@ static void tempsens_setup(void) {
 }
 
 /**
- * tempsens_cycle()
+ * tempsens_thread()
  *
  * main "thread"; every 100ms read the sensor, switch corresponding LEDs
  */
-static void tempsens_cycle(void) {
-    int temp = read_temp();
-    if (temp < GREEN_FROM)
-        set_leds(RED);
-    else if (temp < YELLOW_FROM)
-        set_leds(GREEN);
-    else if (temp < RED_FROM)
-        set_leds(YELLOW);
-    else
-        set_leds(RED);
+static void *tempsens_thread(void *arg) {
+
+    struct timespec period;
+    period.tv_sec = 0;
+    period.tv_nsec = PERIOD_NS;
+
+    for(cycle_no = 0; cycle_no < CYCLES; cycle_no++) {
+        printf("cycle %d\n", cycle_no + 1);
+        int temp = read_temp();
+        if (temp < GREEN_FROM)
+            set_leds(RED);
+        else if (temp < YELLOW_FROM)
+            set_leds(GREEN);
+        else if (temp < RED_FROM)
+            set_leds(YELLOW);
+        else
+            set_leds(RED);
+    }
+    nanosleep(&period, NULL);
+    return NULL;
 }
 
 /**
@@ -156,15 +167,12 @@ static void tempsens_cycle(void) {
  * setup, then run the simulation
  */
 int main(void) {
-    struct timespec period;
-    period.tv_sec = 0;
-    period.tv_nsec = PERIOD_NS;
-
+    pthread_t thread;
     tempsens_setup();
-    for(cycle_no = 0; cycle_no < CYCLES; cycle_no++) {
-        printf("cycle %d\n", cycle_no + 1);
-        tempsens_cycle();
-        nanosleep(&period, NULL);
-    }
+
+    pthread_create(&thread, NULL, tempsens_thread, NULL);
+    pthread_join(thread, NULL);
+        
+
     return 0;
 }
